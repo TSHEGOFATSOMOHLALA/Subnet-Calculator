@@ -1,15 +1,22 @@
-# subnet Calculator
-
-A command-line subnet calculator and IP toolkit for IPv4/IPv6, built on Python's
-standard `ipaddress` module — no third-party dependencies.
+# Subnet Calculator
 
 [![CI](https://github.com/TSHEGOFATSOMOHLALA/Subnet-Calculator/actions/workflows/ci.yml/badge.svg)](https://github.com/TSHEGOFATSOMOHLALA/Subnet-Calculator/actions/workflows/ci.yml)
+
+**[Live demo →](https://TSHEGOFATSOMOHLALA.github.io/Subnet-Calculator/)**
+
+A command-line subnet calculator and IP toolkit for IPv4/IPv6, built on Python's
+standard `ipaddress` module — no third-party dependencies. Also ships as an
+interactive browser demo, no install required.
+
+
+
+## Features
 
 - **info** — network/broadcast address, usable host range, netmask, wildcard mask
 - **split** — divide a network into equal-sized subnets at a target prefix
 - **vlsm** — Variable Length Subnet Masking: allocate right-sized subnets from a list of host requirements
 - **supernet** — find the smallest CIDR block containing a set of networks
-- IPv4 and IPv6 support
+- IPv4 and IPv6 support (CLI/library — the browser demo currently covers IPv4)
 - JSON output for scripting (`--json`)
 
 ## Install

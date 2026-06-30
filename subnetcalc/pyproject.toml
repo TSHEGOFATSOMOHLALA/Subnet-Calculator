@@ -9,7 +9,7 @@ description = "A subnet calculator and IP toolkit: CIDR info, VLSM allocation, s
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Lerato Mohlala" }]
+authors = [{ name = "Tshegofatso Mohlala" }]
 keywords = ["networking", "subnet", "cidr", "vlsm", "ip-address", "cli"]
 classifiers = [
     "Programming Language :: Python :: 3",

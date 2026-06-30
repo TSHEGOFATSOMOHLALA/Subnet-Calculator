@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>subnetcalc — interactive subnetting</title>
+<style>
+  :root{
+    --paper:#eef2f8;
+    --paper-line:#cdd9ec;
+    --ink:#16294a;
+    --ink-soft:#3c4f74;
+    --network:#1f4e79;
+    --network-soft:#dce8f5;
+    --host:#b5651d;
+    --host-soft:#f5e3d2;
+    --error:#9b2c2c;
+    --paper-card:#f7f9fc;
+    --mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+    --display: 'Space Grotesk', 'Segoe UI', sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background-color:var(--paper);
+    background-image:
+      linear-gradient(var(--paper-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--paper-line) 1px, transparent 1px);
+    background-size: 28px 28px;
+    color:var(--ink);
+    font-family: var(--mono);
+    min-height:100vh;
+    padding: 0 0 80px 0;
+  }
+
+  @font-face{ /* fallback note: system fonts used if remote fails */}
+
+  header{
+    padding: 48px 24px 24px;
+    max-width: 980px;
+    margin: 0 auto;
+    border-bottom: 1px dashed var(--paper-line);
+  }
+
+  .eyebrow{
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--host);
+    margin-bottom: 10px;
+  }
+
+  h1{
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(28px, 5vw, 44px);
+    margin: 0 0 8px 0;
+    letter-spacing: -0.01em;
+  }
+
+  .sub{
+    color: var(--ink-soft);
+    font-size: 15px;
+    max-width: 640px;
+    line-height: 1.5;
+  }
+
+  main{
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 32px 24px 0;
+  }
+
+  /* ---------- HERO: bit ruler ---------- */
+  .hero{
+    background: var(--paper-card);
+    border: 1px solid var(--paper-line);
+    border-radius: 4px;
+    padding: 28px;
+    margin-bottom: 28px;
+    position: relative;
+  }
+
+  .hero::before{
+    content: "FIG. 01 — ADDRESS / PREFIX SCHEMATIC";
+    position:absolute;
+    top: -11px; left: 20px;
+    background: var(--paper-card);
+    padding: 0 8px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+  }
+
+  .cidr-row{
+    display:flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 22px;
+  }
+
+  input[type="text"]{
+    font-family: var(--mono);
+    font-size: 18px;
+    background: #fff;
+    border: 1px solid var(--paper-line);
+    border-bottom: 2px solid var(--network);
+    padding: 10px 12px;
+    border-radius: 3px;
+    color: var(--ink);
+    width: 260px;
+  }
+  input[type="text"]:focus{ outline: 2px solid var(--network); outline-offset: 1px; }
+
+  .prefix-slider-wrap{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    flex: 1;
+    min-width: 220px;
+  }
+
+  input[type="range"]{
+    flex:1;
+    accent-color: var(--host);
+  }
+
+  .prefix-label{
+    font-weight:700;
+    width: 48px;
+    text-align:center;
+    color: var(--network);
+  }
+
+  .bit-ruler{
+    display:grid;
+    grid-template-columns: repeat(32, 1fr);
+    gap: 2px;
+    margin-bottom: 8px;
+  }
+
+  .bit{
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: var(--network-soft);
+    border: 1px solid var(--network);
+    transition: background .15s, border-color .15s, transform .1s;
+  }
+  .bit.host{
+    background: var(--host-soft);
+    border-color: var(--host);
+  }
+  .bit.boundary{
+    box-shadow: 0 0 0 2px var(--ink) inset;
+  }
+
+  .octet-labels{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    font-size: 10px;
+    color: var(--ink-soft);
+    letter-spacing: 0.08em;
+    margin-bottom: 18px;
+  }
+  .octet-labels span{ text-align:center; }
+
+  .legend{
+    display:flex;
+    gap: 18px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .legend .swatch{
+    display:inline-block;
+    width: 10px; height:10px;
+    border-radius:2px;
+    margin-right: 6px;
+    vertical-align: -1px;
+  }
+  .swatch.net{ background: var(--network-soft); border: 1px solid var(--network); }
+  .swatch.host{ background: var(--host-soft); border: 1px solid var(--host); }
+
+  .info-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+    margin-top: 24px;
+  }
+
+  .info-cell{
+    background: #fff;
+    border: 1px solid var(--paper-line);
+    border-radius: 3px;
+    padding: 12px 14px;
+  }
+  .info-cell .k{
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .info-cell .v{
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    word-break: break-all;
+  }
+  .info-cell.host .v{ color: var(--host); }
+  .info-cell.net .v{ color: var(--network); }
+
+  .error-msg{
+    color: var(--error);
+    font-size: 13px;
+    margin-top: -8px;
+    margin-bottom: 14px;
+  }
+
+  /* ---------- TABS ---------- */
+  .tabs{
+    display:flex;
+    gap: 2px;
+    margin-bottom: -1px;
+    flex-wrap: wrap;
+  }
+  .tab{
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    padding: 10px 18px;
+    background: var(--paper-line);
+    color: var(--ink-soft);
+    border: 1px solid var(--paper-line);
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+  }
+  .tab.active{
+    background: var(--paper-card);
+    color: var(--ink);
+    border-color: var(--paper-line);
+  }
+
+  .panel{
+    background: var(--paper-card);
+    border: 1px solid var(--paper-line);
+    border-radius: 0 4px 4px 4px;
+    padding: 26px;
+    display:none;
+  }
+  .panel.active{ display:block; }
+
+  .field-row{
+    display:flex;
+    gap: 12px;
+    align-items:center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  button{
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 13px;
+    background: var(--ink);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+  }
+  button:hover{ background: var(--network); }
+  button.ghost{
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1px solid var(--paper-line);
+  }
+  button.ghost:hover{ background: var(--paper-line); color: var(--ink); }
+  button.small{ padding: 6px 12px; font-size:12px; }
+
+  table{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 10px;
+  }
+  th{
+    text-align:left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--paper-line);
+    padding: 6px 8px;
+  }
+  td{
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  tr:hover td{ background: #fff; }
+
+  .vlsm-row{
+    display:flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    align-items:center;
+  }
+  .vlsm-row input{ font-family: var(--mono); padding: 7px 10px; border: 1px solid var(--paper-line); border-radius:3px; }
+  .vlsm-row input.name{ width: 150px; }
+  .vlsm-row input.hosts{ width: 90px; }
+
+  .vlsm-bar-wrap{
+    margin-top: 22px;
+  }
+  .vlsm-bar{
+    display:flex;
+    width: 100%;
+    height: 34px;
+    border-radius: 3px;
+    overflow:hidden;
+    border: 1px solid var(--paper-line);
+  }
+  .vlsm-seg{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 10px;
+    color: #fff;
+    white-space:nowrap;
+    overflow:hidden;
+    border-right: 1px solid rgba(255,255,255,0.4);
+  }
+
+  textarea{
+    font-family: var(--mono);
+    width: 100%;
+    min-height: 110px;
+    border: 1px solid var(--paper-line);
+    border-radius: 3px;
+    padding: 10px;
+    font-size: 13px;
+    resize: vertical;
+  }
+
+  .hint{
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+
+  footer{
+    max-width: 980px;
+    margin: 40px auto 0;
+    padding: 20px 24px;
+    border-top: 1px dashed var(--paper-line);
+    font-size: 12px;
+    color: var(--ink-soft);
+    display:flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  footer a{ color: var(--network); }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; }
+  }
+
+  @media (max-width: 640px){
+    .bit-ruler{ grid-template-columns: repeat(16, 1fr); }
+    .octet-labels{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">subnetcalc / live demo</div>
+  <h1>Subnetting, drawn out.</h1>
+  <p class="sub">Type a network, drag the prefix, and watch which bits belong to the network and which belong to hosts. Everything below runs client-side — no server, no install.</p>
+</header>
+
+<main>
+
+  <section class="hero">
+    <div class="cidr-row">
+      <input type="text" id="cidrInput" value="192.168.1.0/24" spellcheck="false">
+      <div class="prefix-slider-wrap">
+        <input type="range" id="prefixSlider" min="0" max="32" value="24">
+        <div class="prefix-label" id="prefixLabel">/24</div>
+      </div>
+    </div>
+
+    <div class="bit-ruler" id="bitRuler"></div>
+    <div class="octet-labels"><span>octet 1</span><span>octet 2</span><span>octet 3</span><span>octet 4</span></div>
+
+    <div class="legend">
+      <span><span class="swatch net"></span>network bits</span>
+      <span><span class="swatch host"></span>host bits</span>
+    </div>
+
+    <div id="errorMsg" class="error-msg" style="display:none;"></div>
+
+    <div class="info-grid" id="infoGrid"></div>
+  </section>
+
+  <div class="tabs">
+    <div class="tab active" data-panel="splitPanel">Split</div>
+    <div class="tab" data-panel="vlsmPanel">VLSM</div>
+    <div class="tab" data-panel="supernetPanel">Supernet</div>
+  </div>
+
+  <section class="panel active" id="splitPanel">
+    <p class="hint" style="margin-top:0;">Divide the network above into equal-sized subnets at a target prefix length.</p>
+    <div class="field-row">
+      <label for="splitPrefix">New prefix /</label>
+      <input type="text" id="splitPrefix" value="26" style="width:70px;">
+      <button id="splitBtn">Split</button>
+    </div>
+    <div id="splitOutput"></div>
+  </section>
+
+  <section class="panel" id="vlsmPanel">
+    <p class="hint" style="margin-top:0;">Add the host counts you need. Largest is placed first so every block lands on a clean boundary, with nothing wasted in between.</p>
+    <div id="vlsmRows"></div>
+    <div class="field-row">
+      <button class="ghost small" id="addVlsmRow">+ add requirement</button>
+      <button id="vlsmBtn">Allocate</button>
+    </div>
+    <div id="vlsmOutput"></div>
+  </section>
+
+  <section class="panel" id="supernetPanel">
+    <p class="hint" style="margin-top:0;">Paste one CIDR per line. Get back the smallest single block that contains all of them.</p>
+    <textarea id="supernetInput">192.168.0.0/24
+192.168.1.0/24
+192.168.2.0/24
+192.168.3.0/24</textarea>
+    <div class="field-row" style="margin-top:14px;">
+      <button id="supernetBtn">Find supernet</button>
+    </div>
+    <div id="supernetOutput"></div>
+  </section>
+
+</main>
+
+<footer>
+  <span>subnetcalc — IPv4 web demo. Full library (IPv4 + IPv6, CLI) on <a href="https://github.com/TSHEGOFATSOMOHLALA/subnetcalc" target="_blank" rel="noopener">GitHub</a>.</span>
+  <span>Runs entirely in your browser.</span>
+</footer>
+
+<script>
+/* ---------- core IPv4 math ---------- */
+function ipToInt(ip){
+  const parts = ip.trim().split('.');
+  if(parts.length !== 4) throw new Error("Expected 4 octets, e.g. 192.168.1.0");
+  let n = 0;
+  for(const p of parts){
+    if(!/^\d+$/.test(p)) throw new Error(`'${p}' is not a number`);
+    const v = parseInt(p,10);
+    if(v < 0 || v > 255) throw new Error(`'${p}' is out of range 0–255`);
+    n = (n*256) + v;
+  }
+  return n >>> 0;
+}
+function intToIp(n){
+  return [(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255].join('.');
+}
+function prefixToMask(p){
+  if(p<=0) return 0;
+  if(p>=32) return 0xFFFFFFFF >>> 0;
+  return (0xFFFFFFFF << (32-p)) >>> 0;
+}
+function parseCIDR(str){
+  const m = str.trim().match(/^([\d.]+)\/(\d{1,2})$/);
+  if(!m) throw new Error("Use CIDR notation, e.g. 10.0.0.0/24");
+  const ip = m[1];
+  const prefix = parseInt(m[2],10);
+  if(prefix<0 || prefix>32) throw new Error("Prefix must be between 0 and 32");
+  const ipInt = ipToInt(ip);
+  return {ipInt, prefix};
+}
+function networkInfo(ipInt, prefix){
+  const mask = prefixToMask(prefix);
+  const network = (ipInt & mask) >>> 0;
+  const wildcard = (~mask) >>> 0;
+  const broadcast = (network | wildcard) >>> 0;
+  const total = Math.pow(2, 32-prefix);
+  let usable, first, last;
+  if(prefix === 32){ usable = 1; first = network; last = network; }
+  else if(prefix === 31){ usable = 2; first = network; last = broadcast; }
+  else { usable = total - 2; first = network + 1; last = broadcast - 1; }
+  return { network, broadcast, mask, wildcard, total, usable, first, last };
+}
+function smallestPrefixForHosts(n){
+  if(n <= 0) throw new Error("Host count must be at least 1");
+  if(n === 1) return 32;
+  if(n === 2) return 31;
+  for(let p = 30; p >= 0; p--){
+    const total = Math.pow(2, 32-p);
+    if(total - 2 >= n) return p;
+  }
+  throw new Error("That many hosts don't fit in IPv4 space");
+}
+
+/* ---------- bit ruler ---------- */
+const ruler = document.getElementById('bitRuler');
+for(let i=0;i<32;i++){
+  const d = document.createElement('div');
+  d.className = 'bit';
+  d.dataset.idx = i;
+  ruler.appendChild(d);
+}
+
+const cidrInput = document.getElementById('cidrInput');
+const prefixSlider = document.getElementById('prefixSlider');
+const prefixLabel = document.getElementById('prefixLabel');
+const errorMsg = document.getElementById('errorMsg');
+const infoGrid = document.getElementById('infoGrid');
+
+function syncFromCidrText(){
+  try{
+    const {ipInt, prefix} = parseCIDR(cidrInput.value);
+    prefixSlider.value = prefix;
+    render(ipInt, prefix);
+  }catch(e){
+    showError(e.message);
+  }
+}
+
+function syncFromSlider(){
+  try{
+    const {ipInt} = parseCIDR(cidrInput.value.includes('/') ? cidrInput.value : cidrInput.value + '/24');
+    const prefix = parseInt(prefixSlider.value,10);
+    cidrInput.value = intToIp(ipInt) + '/' + prefix;
+    render(ipInt, prefix);
+  }catch(e){
+    showError(e.message);
+  }
+}
+
+function showError(msg){
+  errorMsg.style.display = 'block';
+  errorMsg.textContent = '⚠ ' + msg;
+  infoGrid.innerHTML = '';
+}
+
+function render(ipInt, prefix){
+  errorMsg.style.display = 'none';
+  const bits = ruler.children;
+  for(let i=0;i<32;i++){
+    const isHost = i >= prefix;
+    bits[i].className = 'bit' + (isHost ? ' host' : '') + (i === prefix-1 || i===31 ? '' : '');
+  }
+  if(prefix > 0 && prefix < 32){
+    bits[prefix-1].classList.add('boundary');
+  }
+
+  const info = networkInfo(ipInt, prefix);
+  infoGrid.innerHTML = `
+    <div class="info-cell net"><div class="k">Network</div><div class="v">${intToIp(info.network)}</div></div>
+    <div class="info-cell net"><div class="k">Netmask</div><div class="v">${intToIp(info.mask)}</div></div>
+    <div class="info-cell"><div class="k">Wildcard</div><div class="v">${intToIp(info.wildcard)}</div></div>
+    <div class="info-cell host"><div class="k">Broadcast</div><div class="v">${intToIp(info.broadcast)}</div></div>
+    <div class="info-cell host"><div class="k">Usable range</div><div class="v">${intToIp(info.first)} – ${intToIp(info.last)}</div></div>
+    <div class="info-cell"><div class="k">Usable hosts</div><div class="v">${info.usable.toLocaleString()}</div></div>
+  `;
+}
+
+cidrInput.addEventListener('input', syncFromCidrText);
+prefixSlider.addEventListener('input', syncFromSlider);
+syncFromCidrText();
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.panel).classList.add('active');
+  });
+});
+
+/* ---------- split ---------- */
+document.getElementById('splitBtn').addEventListener('click', ()=>{
+  const out = document.getElementById('splitOutput');
+  try{
+    const {ipInt, prefix} = parseCIDR(cidrInput.value);
+    const newPrefix = parseInt(document.getElementById('splitPrefix').value,10);
+    if(isNaN(newPrefix) || newPrefix <= prefix || newPrefix > 32){
+      throw new Error(`New prefix must be greater than /${prefix} and at most /32`);
+    }
+    const base = networkInfo(ipInt, prefix).network;
+    const count = Math.pow(2, newPrefix - prefix);
+    const step = Math.pow(2, 32 - newPrefix);
+    let rows = '';
+    for(let i=0;i<count;i++){
+      const net = base + i*step;
+      const info = networkInfo(net, newPrefix);
+      rows += `<tr><td>${i+1}</td><td>${intToIp(net)}/${newPrefix}</td><td>${intToIp(info.first)} – ${intToIp(info.last)}</td><td>${info.usable.toLocaleString()}</td></tr>`;
+    }
+    out.innerHTML = `<table><tr><th>#</th><th>Subnet</th><th>Usable range</th><th>Hosts</th></tr>${rows}</table>`;
+  }catch(e){
+    out.innerHTML = `<div class="error-msg">⚠ ${e.message}</div>`;
+  }
+});
+
+/* ---------- VLSM ---------- */
+const vlsmRows = document.getElementById('vlsmRows');
+function addVlsmRow(name='', hosts=''){
+  const row = document.createElement('div');
+  row.className = 'vlsm-row';
+  row.innerHTML = `
+    <input class="name" placeholder="label (e.g. Sales)" value="${name}">
+    <input class="hosts" placeholder="hosts needed" value="${hosts}">
+    <button class="ghost small remove-row">remove</button>
+  `;
+  row.querySelector('.remove-row').addEventListener('click', ()=> row.remove());
+  vlsmRows.appendChild(row);
+}
+addVlsmRow('Sales', '60');
+addVlsmRow('Engineering', '25');
+addVlsmRow('Guest Wi-Fi', '10');
+document.getElementById('addVlsmRow').addEventListener('click', ()=> addVlsmRow());
+
+const palette = ['#1f4e79','#b5651d','#3c6e47','#7a3c6e','#a3781f','#4a5fa3'];
+
+document.getElementById('vlsmBtn').addEventListener('click', ()=>{
+  const out = document.getElementById('vlsmOutput');
+  try{
+    const {ipInt, prefix} = parseCIDR(cidrInput.value);
+    const base = networkInfo(ipInt, prefix);
+    const reqs = [...vlsmRows.querySelectorAll('.vlsm-row')].map(r=>{
+      const name = r.querySelector('.name').value.trim() || 'unnamed';
+      const hosts = parseInt(r.querySelector('.hosts').value,10);
+      if(isNaN(hosts) || hosts <= 0) throw new Error(`'${name}' needs a positive host count`);
+      return {name, hosts};
+    });
+    if(reqs.length === 0) throw new Error("Add at least one requirement");
+
+    reqs.sort((a,b)=> b.hosts - a.hosts);
+
+    let cursor = base.network;
+    const allocations = [];
+    for(const req of reqs){
+      const p = smallestPrefixForHosts(req.hosts);
+      const size = Math.pow(2, 32-p);
+      const aligned = Math.ceil(cursor / size) * size;
+      if(aligned + size - 1 > base.broadcast){
+        throw new Error(`Ran out of space in ${intToIp(base.network)}/${prefix} allocating '${req.name}' (needs /${p})`);
+      }
+      const info = networkInfo(aligned, p);
+      allocations.push({...req, prefix: p, network: aligned, ...info});
+      cursor = aligned + size;
+    }
+
+    let rows = '';
+    let bar = '';
+    const totalSize = base.broadcast - base.network + 1;
+    allocations.forEach((a,i)=>{
+      rows += `<tr><td>${a.name}</td><td>${a.hosts}</td><td>${intToIp(a.network)}/${a.prefix}</td><td>${intToIp(a.first)} – ${intToIp(a.last)}</td><td>${a.usable.toLocaleString()}</td></tr>`;
+      const widthPct = ((Math.pow(2,32-a.prefix)) / totalSize * 100).toFixed(3);
+      const color = palette[i % palette.length];
+      bar += `<div class="vlsm-seg" style="width:${widthPct}%; background:${color};" title="${a.name}: ${intToIp(a.network)}/${a.prefix}">${a.name}</div>`;
+    });
+    const usedSize = allocations.reduce((s,a)=> s + Math.pow(2,32-a.prefix), 0);
+    const freePct = ((totalSize - usedSize)/totalSize*100).toFixed(3);
+    if(freePct > 0){
+      bar += `<div class="vlsm-seg" style="width:${freePct}%; background:#cdd9ec; color:#3c4f74;">free</div>`;
+    }
+
+    out.innerHTML = `
+      <table><tr><th>Label</th><th>Needed</th><th>Block</th><th>Usable range</th><th>Capacity</th></tr>${rows}</table>
+      <div class="vlsm-bar-wrap">
+        <div class="hint" style="margin-bottom:6px;">Layout within ${intToIp(base.network)}/${prefix}</div>
+        <div class="vlsm-bar">${bar}</div>
+      </div>
+    `;
+  }catch(e){
+    out.innerHTML = `<div class="error-msg">⚠ ${e.message}</div>`;
+  }
+});
+
+/* ---------- supernet ---------- */
+document.getElementById('supernetBtn').addEventListener('click', ()=>{
+  const out = document.getElementById('supernetOutput');
+  try{
+    const lines = document.getElementById('supernetInput').value
+      .split('\n').map(l=>l.trim()).filter(Boolean);
+    if(lines.length < 2) throw new Error("Enter at least two CIDR blocks");
+    const nets = lines.map(l=>{
+      const {ipInt, prefix} = parseCIDR(l);
+      return networkInfo(ipInt, prefix);
+    });
+    let minAddr = Math.min(...nets.map(n=>n.network));
+    let maxAddr = Math.max(...nets.map(n=>n.broadcast));
+    const diff = (minAddr ^ maxAddr) >>> 0;
+    let prefix = 32;
+    let mask = 0xFFFFFFFF >>> 0;
+    while(prefix > 0){
+      const testMask = prefixToMask(prefix-1);
+      if(((minAddr & testMask) >>> 0) === ((maxAddr & testMask) >>> 0)){
+        prefix--;
+        mask = testMask;
+      } else break;
+    }
+    const network = (minAddr & mask) >>> 0;
+    const info = networkInfo(network, prefix);
+    out.innerHTML = `
+      <div class="info-grid">
+        <div class="info-cell net"><div class="k">Smallest containing block</div><div class="v">${intToIp(network)}/${prefix}</div></div>
+        <div class="info-cell"><div class="k">Usable range</div><div class="v">${intToIp(info.first)} – ${intToIp(info.last)}</div></div>
+        <div class="info-cell"><div class="k">Total addresses</div><div class="v">${info.total.toLocaleString()}</div></div>
+      </div>
+      <p class="hint">Covers ${nets.length} input block${nets.length>1?'s':''}: ${lines.join(', ')}</p>
+    `;
+  }catch(e){
+    out.innerHTML = `<div class="error-msg">⚠ ${e.message}</div>`;
+  }
+});
+</script>
+
+</body>
+</html>

@@ -1,4 +1,4 @@
-# subnetcalc
+# subnet Calculator
 
 A command-line subnet calculator and IP toolkit for IPv4/IPv6, built on Python's
 standard `ipaddress` module — no third-party dependencies.

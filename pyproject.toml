@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subnetcalc"
+version = "0.1.0"
+description = "A subnet calculator and IP toolkit: CIDR info, VLSM allocation, supernetting"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Tshegofatso Mohlala" }]
+keywords = ["networking", "subnet", "cidr", "vlsm", "ip-address", "cli"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: System :: Networking",
+    "Intended Audience :: Information Technology",
+]
+
+[project.scripts]
+subnetcalc = "subnetcalc.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+include = ["subnetcalc*"]
